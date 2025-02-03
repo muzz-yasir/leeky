@@ -23,18 +23,15 @@ WORKDIR /app
 # Copy dependency files first
 COPY pyproject.toml poetry.lock ./
 
-# Install runpod explicitly
-RUN pip install --no-cache-dir runpod
-
 # Install dependencies without project
-RUN poetry install --no-dev --no-interaction --no-ansi --no-root
+RUN poetry install --only main --no-interaction --no-ansi --no-root
 
 # Copy the rest of the project
 COPY leeky ./leeky
 COPY runpod_handler.py ./
 
 # Install the project itself
-RUN poetry install --no-dev --no-interaction --no-ansi
+RUN poetry install --only main --no-interaction --no-ansi
 
 # Download and cache spaCy model
 RUN python -m spacy download en_core_web_sm
