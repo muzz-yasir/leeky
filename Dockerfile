@@ -24,9 +24,6 @@ WORKDIR /app
 # Copy project metadata files
 COPY pyproject.toml poetry.lock README.md LICENSE ./
 
-# Test GPU availability
-RUN python3 -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'"
-
 # Install dependencies without project
 RUN poetry install --only main --no-interaction --no-ansi --no-root
 
