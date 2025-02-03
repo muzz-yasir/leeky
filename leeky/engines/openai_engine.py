@@ -26,46 +26,17 @@ from leeky.engines.base_engine import BaseEngine
 logger = logging.getLogger(__name__)
 
 # default parameters
-DEFAULT_OPENAI_API_MODEL = "text-davinci-003"
+DEFAULT_OPENAI_API_MODEL = "gpt-3.5-turbo"
 
 # set default valid parameters
 OPENAI_VALID_PARAMETERS = {
     "temperature": [0.0, 0.5, 1.0],
     "max_tokens": [16, 32, 64, 128, 256],
-    "best_of": [1, 2, 4],
+    # Note: 'best_of' is no longer available in chat completion
+    # Add new parameters like:
+    "presence_penalty": [0.0, 0.5, 1.0],
+    "frequency_penalty": [0.0, 0.5, 1.0],
 }
-
-
-def get_openai_api_key() -> str | None:
-    """
-    This function returns the OpenAI API key from the environment variable OPENAI_API_KEY.
-
-    Returns:
-        str | None: The OpenAI API key or None if it is not set anywhere.
-    """
-    # check for env variable defined
-    if "OPENAI_API_KEY" in os.environ:
-        # return the value
-        return os.environ["OPENAI_API_KEY"]
-
-    # check for .openai_key file in current directory
-    local_key_file = Path("./.openai_key")
-    if local_key_file.exists():
-        # return the value
-        file_buffer = local_key_file.read_text().strip()
-        if file_buffer.count("-") == 1 and 48 <= len(file_buffer) <= 52:
-            return file_buffer
-
-    # check for .openai_key file in home directory
-    home_key_file = Path.home() / ".openai_key"
-    if home_key_file.exists():
-        # return the value
-        file_buffer = home_key_file.read_text().strip()
-        if file_buffer.count("-") == 1 and 48 <= len(file_buffer) <= 52:
-            return file_buffer
-
-    # if we get here, we didn't find a key
-    return None
 
 
 class OpenAIEngine(BaseEngine):
@@ -85,34 +56,20 @@ class OpenAIEngine(BaseEngine):
     ) -> None:
         """
         Constructor for the engine.
-        :param model:
-        :param parameters:
         """
+        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-        # set the api key
-        if api_key is None:
-            api_key = get_openai_api_key()
-        if api_key is None:
-            raise ValueError("No API key found for OpenAI API.")
-        self.api_key = openai.api_key = api_key
-
-        # set the model
+        # Model & parameters
         self.model = model
+        self.parameters = parameters if parameters else {}
 
-        # set the parameters
-        if parameters is None:
-            parameters = {}
-        self.parameters = parameters
-
-        # handle retry and sleep settings
+        # Retry and sleep settings
         self.sleep_time = sleep_time
         self.retry_count = retry_count
         self.retry_time = retry_time
 
-        # setup rng
-        if seed is None:
-            seed = numpy.random.randint(0, 2**32 - 1, dtype=numpy.int64)
-        self.rng = numpy.random.RandomState(seed)
+        # Setup RNG
+        self.rng = numpy.random.RandomState(seed or numpy.random.randint(0, 2**32 - 1, dtype=numpy.int64))
 
     def get_name(self) -> str:
         """
@@ -148,30 +105,6 @@ class OpenAIEngine(BaseEngine):
             # yield the parameter dict
             yield parameter_dict
 
-    def get_random_parameters(self) -> dict:
-        """
-        This method returns a random set of parameters.
-
-        Returns:
-            dict: A random set of parameters.
-        """
-        # get a random combination of values from DEFAULT_OPENAI_VALID_PARAMETERS with itertools/functools
-        parameter_combination = self.rng.choice(
-            list(
-                combinations_with_replacement(
-                    OPENAI_VALID_PARAMETERS.values(), len(OPENAI_VALID_PARAMETERS)
-                )
-            )
-        )
-
-        # convert to dict
-        parameter_dict = dict(
-            zip(OPENAI_VALID_PARAMETERS.keys(), parameter_combination)
-        )
-
-        # return the parameter dict
-        return parameter_dict
-
     def set_parameters(self, parameters: dict) -> None:
         """
         This method sets the parameters of the engine.
@@ -186,46 +119,34 @@ class OpenAIEngine(BaseEngine):
         self.parameters = parameters
 
     def get_completions(self, prompt: str, n: int = 1) -> list[str]:
-        """
-        This method returns n completions for the prompt.
-
-        Args:
-            prompt (str): The prompt to complete.
-            n (int): The number of completions to return.
-
-        Returns:
-            list[dict]: A list of completion dictionaries.
-        """
-
-        # response list
         response_list = []
-
-        # setup retry tracker and get requested number of completions
-        retry_count = 0
-
+        
         for _ in range(n):
+            retry_count = 0
             response = None
-            while response is None and retry_count < self.retry_count:
-                if retry_count > self.retry_count:
-                    raise RuntimeError("Too many retries.")
 
+            while response is None and retry_count < self.retry_count:
                 try:
-                    response = openai.Completion.create(
-                        model=self.model, prompt=prompt, **self.parameters
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[{"role": "system", "content": "You are a helpful assistant."},
+                                  {"role": "user", "content": prompt}],
+                        **self.parameters
                     )
 
-                    # set response if present
-                    if len(response["choices"]) > 0:
-                        response_list.append(response["choices"][0]["text"])
+                    if response.choices:
+                        response_list.append(response.choices[0].message.content)
                     else:
                         response = None
                 except Exception as e:
-                    logger.error("OpenAI API error (try=%d): %s", retry_count, e)
+                    logger.error(f"OpenAI API error (try={retry_count}): {e}")
                     retry_count += 1
-
-                    # sleep
                     time.sleep(self.retry_time)
-                    continue
 
-        # return the completions
         return response_list
+
+    def get_random_parameters(self) -> dict:
+        """
+        Returns a random set of parameters.
+        """
+        return {key: self.rng.choice(values) for key, values in OPENAI_VALID_PARAMETERS.items()}

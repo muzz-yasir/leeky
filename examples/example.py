@@ -27,8 +27,6 @@ from leeky.methods.source_recall import SourceRecallTester
 from leeky.methods.search import SearchTester
 
 
-# set parameters for testing
-OPENAI_API_KEY = None
 
 # this is public and can be used by anyone with valid API keys
 # if you want to create your own, see: https://programmablesearchengine.google.com/
@@ -40,11 +38,11 @@ if __name__ == "__main__":
     console = Console(width=200)
 
     # initialize default engine, which we'll assume is OpenAI text-davinci-001 for this testing
-    #engine = OpenAIEngine(api_key=OPENAI_API_KEY, model="text-davinci-003")
+    engine = OpenAIEngine(model="gpt-4o-mini")
     #engine = GTPNeoEngine(parameters={"temperature": 0.5, "max_length": 512})
     #engine = GTPJEngine(parameters={"temperature": 0.5, "max_length": 512})
     #engine = T5Engine(parameters={"temperature": 0.5, "max_length": 512})
-    engine = BloomEngine(parameters={"temperature": 0.5, "max_length": 512})
+    #engine = BloomEngine(parameters={"temperature": 0.5, "max_length": 512})
 
     # set number of samples to generate
     num_samples = 3
@@ -79,7 +77,6 @@ for extended robot video games as part of cool employer benefit programs."""
 
     source_veracity_tester = SourceVeracityTester(completion_engine=engine)
     source_recall_tester = SourceRecallTester(completion_engine=engine)
-    search_tester = SearchTester(google_search_method="api")
 
     # that's it - the rest of this is just formatting for pretty output.
 
@@ -99,7 +96,6 @@ for extended robot video games as part of cool employer benefit programs."""
             "source_recall": source_recall_tester.test(
                 text_1, match_list=["Constitution", "Preamble"], num_samples=num_samples
             ),
-            "search": search_tester.test(text_1, num_samples=1),
         },
         "text_2": {
             "recital": recital_tester.test(text_2, num_samples=num_samples),
@@ -115,7 +111,6 @@ for extended robot video games as part of cool employer benefit programs."""
             "source_recall": source_recall_tester.test(
                 text_2, match_list=["Constitution", "Preamble"], num_samples=num_samples
             ),
-            "search": search_tester.test(text_2, num_samples=1),
         },
     }
 
@@ -139,7 +134,6 @@ for extended robot video games as part of cool employer benefit programs."""
                 "source_recall": source_recall_tester.test(
                     text_3, match_list=["Wikipedia", "RICO"], num_samples=num_samples
                 ),
-                "search": search_tester.test(text_3, num_samples=1),
             },
             "text_4": {
                 "recital": recital_tester.test(text_4, num_samples=num_samples),
@@ -155,7 +149,6 @@ for extended robot video games as part of cool employer benefit programs."""
                 "source_recall": source_recall_tester.test(
                     text_4, match_list=["Wikipedia", "RICO"], num_samples=num_samples
                 ),
-                "search": search_tester.test(text_4, num_samples=1),
             },
         }
     )
@@ -168,7 +161,6 @@ for extended robot video games as part of cool employer benefit programs."""
             "semantic_recital": results["text_1"]["semantic_recital"]["score"],
             "source_veracity": results["text_1"]["source_veracity"]["score"],
             "source_recall": results["text_1"]["source_recall"]["score"],
-            "search": results["text_1"]["search"]["score"],
         },
         "text_2": {
             "recital": results["text_2"]["recital"]["score"],
@@ -176,7 +168,6 @@ for extended robot video games as part of cool employer benefit programs."""
             "semantic_recital": results["text_2"]["semantic_recital"]["score"],
             "source_veracity": results["text_2"]["source_veracity"]["score"],
             "source_recall": results["text_2"]["source_recall"]["score"],
-            "search": results["text_2"]["search"]["score"],
         },
         "text_3": {
             "recital": results["text_3"]["recital"]["score"],
@@ -184,7 +175,6 @@ for extended robot video games as part of cool employer benefit programs."""
             "semantic_recital": results["text_3"]["semantic_recital"]["score"],
             "source_veracity": results["text_3"]["source_veracity"]["score"],
             "source_recall": results["text_3"]["source_recall"]["score"],
-            "search": results["text_3"]["search"]["score"],
         },
         "text_4": {
             "recital": results["text_4"]["recital"]["score"],
@@ -192,7 +182,6 @@ for extended robot video games as part of cool employer benefit programs."""
             "semantic_recital": results["text_4"]["semantic_recital"]["score"],
             "source_veracity": results["text_4"]["source_veracity"]["score"],
             "source_recall": results["text_4"]["source_recall"]["score"],
-            "search": results["text_4"]["search"]["score"],
         },
     }
 
@@ -209,7 +198,6 @@ for extended robot video games as part of cool employer benefit programs."""
     table.add_column("Semantic Recital", justify="center")
     table.add_column("Source Veracity", justify="center")
     table.add_column("Source Recall", justify="center")
-    table.add_column("Search", justify="center")
 
     # add the rows
     table.add_row(
@@ -219,7 +207,6 @@ for extended robot video games as part of cool employer benefit programs."""
         str(scores["text_1"]["semantic_recital"]),
         str(scores["text_1"]["source_veracity"]),
         str(scores["text_1"]["source_recall"]),
-        str(scores["text_1"]["search"]),
     )
     table.add_row(
         "Text in style of Preamble, novel",
@@ -228,7 +215,6 @@ for extended robot video games as part of cool employer benefit programs."""
         str(scores["text_2"]["semantic_recital"]),
         str(scores["text_2"]["source_veracity"]),
         str(scores["text_2"]["source_recall"]),
-        str(scores["text_2"]["search"]),
     )
     table.add_row(
         "RICO Act, Wikipedia",
@@ -237,7 +223,6 @@ for extended robot video games as part of cool employer benefit programs."""
         str(scores["text_3"]["semantic_recital"]),
         str(scores["text_3"]["source_veracity"]),
         str(scores["text_3"]["source_recall"]),
-        str(scores["text_3"]["search"]),
     )
     table.add_row(
         "Fake RICO Act, novel",
@@ -246,7 +231,6 @@ for extended robot video games as part of cool employer benefit programs."""
         str(scores["text_4"]["semantic_recital"]),
         str(scores["text_4"]["source_veracity"]),
         str(scores["text_4"]["source_recall"]),
-        str(scores["text_4"]["search"]),
     )
 
     # show the table
