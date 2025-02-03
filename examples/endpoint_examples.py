@@ -32,7 +32,13 @@ class LeekyEndpoint:
                 timeout=30
             )
             response.raise_for_status()
-            return response.json()["output"]
+            response_data = response.json()
+            print("Full response:", response_data)  # Debug print
+            
+            # Handle both possible response formats
+            if isinstance(response_data, dict):
+                return response_data.get("output") or response_data
+            return response_data
         
         except requests.exceptions.Timeout:
             rprint("[red]Request timed out - the analysis took too long[/red]")
@@ -139,8 +145,8 @@ def main():
     
     # Initialize the endpoint
     endpoint = LeekyEndpoint(
-        endpoint_url="https://api.runpod.ai/v2/{endpoint-id}/run",
-        api_key="your-runpod-api-key"
+        endpoint_url="https://api.runpod.ai/v2/7j7d04zs937ynt/run",
+        api_key="rpa_X18YC8AFEGOD0VTSOEMVS74OLV0Q1EHP7OEXA1BG1hq2cx"
     )
 
     # 1. Basic Analysis Example
@@ -151,49 +157,49 @@ def main():
     if basic_result:
         rprint("Basic Analysis Scores:", basic_result["scores"])
 
-    # 2. Advanced Analysis Example
-    rprint("\n[bold cyan]Advanced Analysis Example:[/bold cyan]")
-    advanced_result = endpoint.advanced_analysis(
-        text="The RICO Act provides for extended criminal penalties and a civil cause of action...",
-        source="Legal Documentation",
-        match_list=["RICO", "criminal", "penalties", "organization"],
-        selected_testers=["contextual_recital", "source_recall", "semantic_recital"],
-        engine_config={
-            "contextual_recital": "openai",
-            "source_recall": "gptj",
-            "semantic_recital": "bloom"
-        }
-    )
-    if advanced_result:
-        rprint("Advanced Analysis Scores:", advanced_result["scores"])
+    # # 2. Advanced Analysis Example
+    # rprint("\n[bold cyan]Advanced Analysis Example:[/bold cyan]")
+    # advanced_result = endpoint.advanced_analysis(
+    #     text="The RICO Act provides for extended criminal penalties and a civil cause of action...",
+    #     source="Legal Documentation",
+    #     match_list=["RICO", "criminal", "penalties", "organization"],
+    #     selected_testers=["contextual_recital", "source_recall", "semantic_recital"],
+    #     engine_config={
+    #         "contextual_recital": "openai",
+    #         "source_recall": "gptj",
+    #         "semantic_recital": "bloom"
+    #     }
+    # )
+    # if advanced_result:
+    #     rprint("Advanced Analysis Scores:", advanced_result["scores"])
         
-        rprint("\nDetailed Results:")
-        for test_name, result in advanced_result["full_results"].items():
-            rprint(f"\n[bold]{test_name}:[/bold]")
-            rprint(f"Score: {result['score']}")
-            if 'samples' in result:
-                rprint("Samples:")
-                for sample in result['samples']:
-                    rprint(f"- {sample}")
+    #     rprint("\nDetailed Results:")
+    #     for test_name, result in advanced_result["full_results"].items():
+    #         rprint(f"\n[bold]{test_name}:[/bold]")
+    #         rprint(f"Score: {result['score']}")
+    #         if 'samples' in result:
+    #             rprint("Samples:")
+    #             for sample in result['samples']:
+    #                 rprint(f"- {sample}")
 
-    # 3. Text Comparison Example
-    rprint("\n[bold cyan]Text Comparison Example:[/bold cyan]")
-    texts = {
-        "original": "The RICO Act is a United States federal law that provides for extended criminal penalties.",
-        "modified": "The RICO Act is a helpful law that maybe does something about crime, probably."
-    }
+    # # 3. Text Comparison Example
+    # rprint("\n[bold cyan]Text Comparison Example:[/bold cyan]")
+    # texts = {
+    #     "original": "The RICO Act is a United States federal law that provides for extended criminal penalties.",
+    #     "modified": "The RICO Act is a helpful law that maybe does something about crime, probably."
+    # }
     
-    comparison_results = endpoint.compare_texts(
-        original_text=texts["original"],
-        modified_text=texts["modified"],
-        source="Legal Database",
-        match_list=["RICO", "law", "criminal"]
-    )
+    # comparison_results = endpoint.compare_texts(
+    #     original_text=texts["original"],
+    #     modified_text=texts["modified"],
+    #     source="Legal Database",
+    #     match_list=["RICO", "law", "criminal"]
+    # )
     
-    if comparison_results:
-        for text_type, results in comparison_results.items():
-            rprint(f"\n[bold]{text_type.title()} Text Results:[/bold]")
-            rprint("Scores:", results["scores"])
+    # if comparison_results:
+    #     for text_type, results in comparison_results.items():
+    #         rprint(f"\n[bold]{text_type.title()} Text Results:[/bold]")
+    #         rprint("Scores:", results["scores"])
 
 if __name__ == "__main__":
     main()
