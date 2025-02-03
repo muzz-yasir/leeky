@@ -15,7 +15,6 @@ WORKDIR /app
 # Copy project files
 COPY pyproject.toml poetry.lock ./
 COPY leeky ./leeky
-COPY handlers ./handlers
 
 # Install dependencies
 RUN poetry config virtualenvs.create false \
