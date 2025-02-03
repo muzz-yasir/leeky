@@ -38,8 +38,8 @@ RUN poetry install --only main --no-interaction --no-ansi
 RUN python -m spacy download en_core_web_sm && \
     python3 -c "import spacy; nlp = spacy.load('en_core_web_sm'); assert nlp, 'SpaCy model not loaded correctly'"
 
-# Verify runpod is installed
-RUN python3 -c "import runpod; print(f'RunPod version: {runpod.__version__}')"
+# Verify runpod is installed (simple import check)
+RUN python3 -c "import runpod"
 
 # Start the handler
 CMD ["python", "-u", "runpod_handler.py"]
