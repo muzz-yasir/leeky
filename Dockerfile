@@ -1,41 +1,28 @@
-FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+FROM nvidia/cuda:11.7.1-runtime-ubuntu22.04
 
-# Install system dependencies and clean up in the same layer
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+# Install Python and dependencies
 RUN apt-get update && apt-get install -y \
-    git \
-    curl \
+    python3.10 \
     python3-pip \
-    python3-dev \
-    build-essential \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir runpod
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Copy only what's needed for dependency installation
-COPY pyproject.toml poetry.lock README.md LICENSE ./
+# Install runpod and other direct dependencies
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Install Poetry and add to PATH
-ENV POETRY_HOME=/opt/poetry
-ENV POETRY_VERSION=1.4.2
-ENV PATH="/opt/poetry/bin:$PATH"
-ENV PATH="/root/.local/bin:$PATH"
-
-RUN curl -sSL https://install.python-poetry.org | python3 - \
-    && poetry config virtualenvs.create false \
-    && poetry install --only main --no-interaction --no-ansi --no-root \
-    && rm -rf ~/.cache/pypoetry
-
-# Copy the project files
+# Copy the application
 COPY leeky ./leeky
-COPY runpod_handler.py ./
+COPY runpod_handler.py .
 
-# Final installation and cleanup
-RUN poetry install --only main --no-interaction --no-ansi \
-    && python -m spacy download en_core_web_sm \
-    && rm -rf ~/.cache/pip
+# Download spaCy model
+RUN python3 -m spacy download en_core_web_sm
 
 # Start the handler
-CMD ["python", "-u", "runpod_handler.py"]
+CMD ["python3", "-u", "runpod_handler.py"]

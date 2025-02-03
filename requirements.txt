@@ -1,0 +1,12 @@
+torch>=2.0.1
+runpod>=0.9.0
+openai>=0.26.3
+numpy>=1.24.1
+spacy>=3.5.0
+rapidfuzz>=2.13.7
+httpx[h2]>=0.23.3
+rich>=13.2.0
+playwright>=1.30.0
+transformers>=4.26.0
+accelerate>=0.15.0
+sentencepiece>=0.1.97
