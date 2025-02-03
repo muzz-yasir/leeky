@@ -199,7 +199,7 @@ class SourceVeracityTester:
 
             # send the text to the completion engine
             sample = {
-                "prompt_method": str(prompt_method.__name__),
+                "prompt_method": str(prompt_method(sample_text)),
                 "num_tokens_sample": num_tokens_sample,
                 "sample_text": sample_text,
                 "text_completion": None,

@@ -136,10 +136,10 @@ Source: {source}
 
 
 RECITAL_COMPLETION_PROMPTS = (
-    completion_prompt_001,
-    completion_prompt_002,
-    completion_prompt_003,
-    completion_prompt_004,
+    # completion_prompt_001,
+    # completion_prompt_002,
+    # completion_prompt_003,
+    # completion_prompt_004,
     completion_prompt_005,
     completion_prompt_006,
     completion_prompt_007,
@@ -229,7 +229,7 @@ class ContextualRecitalTester(RecitalTester):
 
             # send the text to the completion engine
             sample = {
-                "prompt_method": str(prompt_method.__name__),
+                "prompt_method": str(prompt_method(initial_text, self.source)),
                 "num_initial_tokens": num_initial_tokens,
                 "initial_text": initial_text,
                 "terminal_text": terminal_text,

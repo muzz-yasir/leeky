@@ -211,7 +211,7 @@ class RecitalTester:
 
             # send the text to the completion engine
             sample = {
-                "prompt_method": str(prompt_method.__name__),
+                "prompt_method": str(prompt_method(initial_text)),
                 "num_initial_tokens": num_initial_tokens,
                 "initial_text": initial_text,
                 "terminal_text": terminal_text,
