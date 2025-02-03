@@ -17,8 +17,13 @@ WORKDIR /app
 # Copy only what's needed for dependency installation
 COPY pyproject.toml poetry.lock README.md LICENSE ./
 
-# Install Poetry and dependencies in one layer
-RUN curl -sSL https://install.python-poetry.org | python3 - --version 1.4.2 \
+# Install Poetry and add to PATH
+ENV POETRY_HOME=/opt/poetry
+ENV POETRY_VERSION=1.4.2
+ENV PATH="/opt/poetry/bin:$PATH"
+ENV PATH="/root/.local/bin:$PATH"
+
+RUN curl -sSL https://install.python-poetry.org | python3 - \
     && poetry config virtualenvs.create false \
     && poetry install --only main --no-interaction --no-ansi --no-root \
     && rm -rf ~/.cache/pypoetry
