@@ -1,0 +1,26 @@
+# Leeky Configuration
+
+# Data loader configuration
+data_loader:
+  batch_size: 100
+  cache_enabled: False
+
+# Test runner configuration
+test_runner:
+  batch_size: 10
+  max_retries: 3
+  timeout: 30.0
+  sampling_strategy: "random"
+  sampling_parameters:
+    size: 10
+
+# Engine configuration
+engine:
+  engine_type: "openai"
+  parameters:
+    temperature: 0.7
+    max_tokens: 100
+    model: "gpt-4"
+    top_p: 1.0
+    frequency_penalty: 0.0
+    presence_penalty: 0.0

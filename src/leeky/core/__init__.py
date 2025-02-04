@@ -1,0 +1,3 @@
+"""
+Leeky core package initialization
+"""

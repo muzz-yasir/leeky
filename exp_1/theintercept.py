@@ -28,11 +28,6 @@ from leeky.methods.search import SearchTester
 
 
 
-# this is public and can be used by anyone with valid API keys
-# if you want to create your own, see: https://programmablesearchengine.google.com/
-GOOGLE_SEARCH_ENGINE_ID = "97f6bca7b22b74752"
-
-
 if __name__ == "__main__":
     # initialize console with wide display
     console = Console(width=200)

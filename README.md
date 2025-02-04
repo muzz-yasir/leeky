@@ -1,212 +1,207 @@
-## leeky: Leakage/contamination testing for black box language models
-<img src="leeky.png" alt="DALL-E generated logo of a leek in a bucket that is NOT leaking." width="100" />
+# Leeky
 
-This repository implements training data contamination testing methods that support
-black box text completion models, including OpenAI's models or HuggingFace models.
+A Python package for testing and evaluating language model prompts. Leeky provides a modular and extensible framework for experimenting with different prompting techniques, evaluating their effectiveness, and tracking performance over time.
 
+## Features
 
-## Example Results
-The following table is generated from the `examples/example.py` script.
+- Modular architecture for prompt testing and evaluation
+- Support for multiple completion engines (OpenAI, etc.)
+- Configurable data loading and preprocessing
+- Extensible prompt template management
+- Async support for efficient batch processing
+- Multiple evaluation metrics
+- Result storage and analysis
+- Performance tracking and visualization
+- YAML-based configuration
 
-It shows that the methods in this repository can effectively discriminate between
-information that is in the training data and information that is not in the training
-data. 
+## Installation
 
-Further research on behavior in common models and for k-eidetic samples is ongoing.
+```bash
+# Install with poetry
+poetry install
 
-| Text                                            | Recital               | Contextual Recital | Semantic Recital       | Source Veracity | Source Recall | Search   |
-|--------------------------------------------------|------------------------|--------------------|------------------------|------------------|----------------|----------|
-| Preamble, US Constitution                       | 0.91                   | 1.00                | 0.53                    | 1.00              | 1.00           | 87100.00 |
-| Text in style of Preamble, novel                | 0.01                   | 0.10                | 0.10                    | 0.00              | None         | 0.00     |
-| RICO Act, Wikipedia                             | 1.00                   | 0.95                | 0.46                    | 1.00              | 1.00           | 4738.00  |
-| Fake RICO Act, novel                           | 0.07                   | 0.03                | 0.10                    | 0.00              | None         | 0.00     |
+# Install additional dependencies
+poetry run python -m spacy download en_core_web_lg
+```
 
+## Quick Start
 
-The following methods are currently implemented:
+1. Create a configuration file (`config.yaml`):
+```yaml
+data_loader:
+  batch_size: 100
+  cache_enabled: true
+  cache_dir: ".cache"
 
-### A. Recital without context
-Provide the model with an initial sequence of `N` tokens from the source material; this
-sequence is typically the initial tokens of a segment of text, but can also be sampled
-from a random position within the source.
+test_runner:
+  batch_size: 10
+  max_retries: 3
+  timeout: 30.0
+  sampling_strategy: "random"
+  sampling_parameters:
+    size: 1000
 
-The model is then prompted to complete the sequence without context `M` times using `K` 
-non-contextual completion prompts.  This method generates `M * K` samples, which are then
-compared against the unseen portion of the source material for recitation, i.e., verbatim 
-completion of the original tokens beginning at position N+1.
+engine:
+  engine_type: "openai"
+  parameters:
+    temperature: 0.7
+    max_tokens: 100
+    model: "gpt-4"
+```
 
-The score for this approach is the average proportion of tokens in the M * K samples that
-are identical to the original tokens at position `{N+1, ...}`.
+2. Set your OpenAI API key:
+```bash
+export LEEKY_ENGINE_API_KEY=your-api-key
+```
 
-**Code**:
+3. Use the package:
 ```python
-from leeky.engines.openai_engine import OpenAIEngine
-from leeky.methods.recital import RecitalTester
-
-engine = OpenAIEngine(api_key=OPENAI_API_KEY, model="text-davinci-003")
-
-recital_tester = RecitalTester(completion_engine=engine)
-result = recital_tester.test(text_1, num_samples=5)
+async def main():
+    # Load configuration
+    config = Configuration("config.yaml")
+    
+    # Initialize components
+    data_loader = DataLoader(config.get_data_loader_config())
+    prompt_manager = PromptManager()
+    test_runner = TestRunner(
+        prompt_manager,
+        OpenAIEngine(),
+        config.get_test_config()
+    )
+    evaluator = Evaluator([TokenMatchMetric()])
+    
+    # Load test data
+    texts = data_loader.load_from_directory("test_data/")
+    
+    # Run tests
+    results = await test_runner.run_batch(
+        texts,
+        prompt_manager.get_all_templates()
+    )
+    
+    # Evaluate and rank prompts
+    evaluation = evaluator.evaluate_batch(results)
+    rankings = evaluator.rank_prompts(evaluation)
 ```
 
+See `examples/prompt_testing.py` for a complete example.
 
-**Example:** Article III of the US Constitution is recited by `text-davinci-003`.
-```
-<PROMPT>Please complete the following text:
-Text: The judicial Power shall extend to all Cases, in Law and Equity, arising
-<COMPLETION>under this Constitution, the laws of the United States, and Treaties made,
- or which shall be made, under their Authority.
-```
+## Architecture
 
-100% of tokens match the original text (Article III).
+The package is organized into several core modules:
 
-### B. Contextual recital
-As in Method A: Recital testing without context, but the model is prompted to complete the
-sequence with explicit knowledge of the source in question.
+### Data Loading (`data_loader.py`)
+- Handles loading text from files and directories
+- Supports batch processing
+- Includes caching capabilities
+- Handles preprocessing
 
-For example, instead of simply prompting the model to complete text, tell the model to
-complete text *from a specific source*.
+### Prompt Management (`prompt_manager.py`)
+- Manages prompt templates
+- Tracks template versions
+- Records performance metrics
+- Supports template parameters
 
-As in Method A, the score for this approach is the average proportion of tokens in the 
-`M * K` samples that are identical to the original tokens at position `{N+1, ...}`.
+### Test Runner (`test_runner.py`)
+- Executes prompt tests
+- Supports async operations
+- Handles retries and timeouts
+- Configurable sampling strategies
 
+### Evaluator (`evaluator.py`)
+- Multiple evaluation metrics
+- Prompt effectiveness ranking
+- Statistical analysis
+- Performance tracking
 
-**Code**:
+### Results Management (`results_manager.py`)
+- Structured result storage
+- Export capabilities (JSON, CSV)
+- Report generation
+- Basic visualization
+
+### Configuration (`config.py`)
+- YAML-based configuration
+- Environment variable support
+- Parameter validation
+- Default configurations
+
+## Adding New Components
+
+### Adding a New Metric
 ```python
-from leeky.engines.openai_engine import OpenAIEngine
-from leeky.methods.contextual_recital import ContextualRecitalTester
+from leeky.core import BaseMetric, MetricResult, PromptResult
 
-engine = OpenAIEngine(api_key=OPENAI_API_KEY, model="text-davinci-003")
+class CustomMetric(BaseMetric):
+    def evaluate(self, result: PromptResult) -> MetricResult:
+        # Implement evaluation logic
+        score = calculate_score(result)
+        return MetricResult(
+            metric=self.metric,
+            score=score,
+            details={"custom_info": "value"},
+            timestamp=datetime.now()
+        )
 
-contextual_recital_tester = ContextualRecitalTester(completion_engine=engine, source="Wikipedia")
-result = contextual_recital_tester.test(text_1, num_samples=5)
+    def evaluate_batch(self, results: Sequence[PromptResult]) -> List[MetricResult]:
+        return [self.evaluate(result) for result in results]
 ```
 
-**Example:** Article III of the US Constitution is recited by `text-davinci-003`.
-
-```
-<PROMPT>Please complete the following text from Article III of the US Constitution:
-Text: The judicial Power shall extend to all Cases, in Law and Equity, arising
-<COMPLETION>this Constitution, the Laws of the United States, and Treaties made, or which shall be made, under their Authority;--to all Cases affecting Ambassadors, other public Ministers and Consuls;--to all Cases of admiralty and maritime jurisdiction;--to Controversies to which the United States shall be a Party;--to Controversies between two or more States;--between a State and Citizens of another State;--between Citizens of different States;--between Citizens of the same State claiming Lands under Grants of different States, and between a State, or the Citizens thereof, and foreign States, Citizens or Subjects.[...]
-```
-
-100% of tokens match the original text (Article III).
-
-### C. Semantic recital
-Provide the model with an initial sequence of `N` tokens from the source material; this
-sequence is typically the initial tokens of a segment of text, but can also be sampled
-from a random position within the source.
-
-The model is then prompted to complete the sequence with or without context `M` times
-using `K` completion prompts.  This method generates `M * K` samples, which are then
-compared against the unseen portion of the source material for recitation.
-
-Unlike in Methods A and B, the score for this approach is not based on verbatim
-token recital.  Instead, the score is based on a semantic similarity using
-a non-LLM technique, such as:
-  * Jaccard stem/lemma sets or frequency vectors
-  * word2vec, doc2vec, or BERT similarity of the original and generated text
-  * number of tokens within \eps threshold in word embedding space
-
-**Code**:
+### Adding a New Engine
 ```python
-from leeky.engines.openai_engine import OpenAIEngine
-from leeky.methods.semantic_recital import SemanticRecitalTester, SimilarityType
+from leeky.core import CompletionEngine
 
-engine = OpenAIEngine(api_key=OPENAI_API_KEY, model="text-davinci-003")
-
-semantic_recital_tester = SemanticRecitalTester(
-    completion_engine=engine,
-    similarity_method=SimilarityType.SPACY_SIMILARITY_POINTS
-)
-result = semantic_recital_tester.test(text_1, num_samples=5)
+class CustomEngine(CompletionEngine):
+    async def complete(self, prompt: str, **kwargs) -> str:
+        # Implement completion logic
+        response = await your_api_call(prompt, **kwargs)
+        return response.text
 ```
 
-### D. Source veracity
-Provide the model with a sequence of `N` tokens from the source material, which can be
-either a subset or the complete text.  
-
-The model is then simply asked to answer, Yes or No, whether the sequence of tokens
-is from a real source, up to `M` times, using `K` different prompts.  This method
-generates `M * K` samples, which are then compared the known value (generally, Yes).
-
-```
-Is this text from a real document?  Answer yes or no.
-----
-Text: The Robot Interaction and Cool Organizations (RICO) Act is a United States federal law that provides for extended robot video games as part of cool employer benefit programs.
-----
-Answer: No
-```
-
-```
-Is this text from a real document?  Answer yes or no.
-----
-Text: The Racketeer Influenced and Corrupt Organizations (RICO) Act is a United States federal law that provides for extended criminal penalties and a civil cause of action for acts performed as part of an ongoing criminal organization.
-----
-Answer: Yes
-```
-
-**Code**:
+### Adding a New Data Source
 ```python
-from leeky.engines.openai_engine import OpenAIEngine
-from leeky.methods.source_veracity import SourceVeracityTester
+from leeky.core import DataLoader, TextSource
 
-engine = OpenAIEngine(api_key=OPENAI_API_KEY, model="text-davinci-003")
-
-source_veracity_tester = SourceVeracityTester(completion_engine=engine)
-result = source_veracity_tester.test(text_1, num_samples=5)
+class CustomDataLoader(DataLoader):
+    def load_from_custom_source(self, source_id: str) -> TextSource:
+        # Implement custom loading logic
+        content = fetch_content(source_id)
+        return TextSource(
+            content=content,
+            source_id=source_id,
+            metadata={"source": "custom"},
+            timestamp=datetime.now()
+        )
 ```
 
-### E. Source recall
-Provide the model with a sequence of `N` tokens from the source material, which can be
-either a subset or the complete text.  
+## Development
 
-The model is then prompted to recall the source of the text `M` times using `K` generic
-prompts related to recalling source.  This method generates `M * K` samples, which are
-then compared against the original source material for recitation, e.g., the original
-document name, URL, or other valid identifier.
+### Running Tests
+```bash
+# Run all tests
+poetry run pytest
 
-The score for this approach is the proportion of correct sources in the `M * K`
-samples generated.
+# Run with coverage
+poetry run pytest --cov=leeky
 
-**Example:** Article III of the US Constitution is recited by `text-davinci-003`.
-
-```
-<PROMPT>What is the source of the following text?
-----
-Text: The judicial Power shall extend to all Cases, in Law and Equity, arising under this Constitution, the Laws of the United States, and Treaties made, or which shall be made, under their Authority;
-----
-Source: 
-<COMPLETION>US Constitution, Article III, Section 2
+# Run async tests
+poetry run pytest --asyncio-mode=auto
 ```
 
-This is a valid description of the source of the text, which can be checked via substring
-or fuzzy string matching.
-
-
-**Code**:
-```python
-from leeky.engines.openai_engine import OpenAIEngine
-from leeky.methods.source_recall import SourceRecallTester
-
-engine = OpenAIEngine(api_key=OPENAI_API_KEY, model="text-davinci-003")
-
-source_recall_tester = SourceRecallTester(completion_engine=engine)
-result = source_recall_tester.test(text_1, match_list=["Constitution", "Preamble"], num_samples=5)
+### Code Style
+The project uses black for code formatting:
+```bash
+poetry run black .
 ```
 
+## Contributing
 
-### F. Search Engines
-Provide a random substring of the source material to a search engine like Google Search, Bing,
-or Archive.org.  Generate `M` samples like this.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
 
-Unlike the other methods, this method does not return a score in [0.0, 1.0].  Instead,
-this method returns the average number of results from the search engine across the
-`M` samples.
+## License
 
-```python
-
-from leeky.methods.search import SearchTester
-
-search_tester = SearchTester()
-result = search_tester.test(text_1, num_samples=5)
-```
+Apache License 2.0
