@@ -12,7 +12,8 @@ from .types import (
     PromptTemplate,
     PromptResult,
     BatchResult,
-    LeekyError
+    LeekyError,
+    TestConfig
 )
 from .prompt_manager import PromptManager
 
@@ -47,8 +48,15 @@ class TestRunner:
         self,
         prompt_manager: PromptManager,
         engine: CompletionEngine,
-        config: Dict[str, Any]
+        config: TestConfig
     ):
+        """Initialize the test runner.
+        
+        Args:
+            prompt_manager: PromptManager instance for template management.
+            engine: CompletionEngine instance for generating completions.
+            config: Configuration dictionary.
+        """
         """Initialize the test runner.
         
         Args:
@@ -58,11 +66,18 @@ class TestRunner:
         """
         self.prompt_manager = prompt_manager
         self.engine = engine
-        self.batch_size = config.get("batch_size", 10)
-        self.max_retries = config.get("max_retries", 3)
-        self.timeout = config.get("timeout", 30.0)
-        self.sampling_strategy = config.get("sampling_strategy", "random")
-        self.sampling_parameters = config.get("sampling_parameters", {})
+        self.batch_size = config.batch_size
+        self.max_retries = config.max_retries
+        self.timeout = config.timeout
+        self.sampling_strategy = config.sampling_strategy
+        self.sampling_parameters = config.sampling_parameters
+        
+        # Text splitting configuration
+        self.text_splitting = config.text_splitting if config.text_splitting else {
+            "enabled": True,
+            "strategy": "sentence",
+            "split_ratio": 0.8
+        }
 
     async def run_single(
         self,
@@ -86,11 +101,25 @@ class TestRunner:
         start_time = time.time()
         
         try:
+            # Split text if enabled
+            if self.text_splitting["enabled"]:
+                text.split_for_completion(
+                    split_ratio=self.text_splitting["split_ratio"],
+                    strategy=self.text_splitting["strategy"]
+                )
+                input_content = text.context_portion
+                
+                # Estimate completion token count
+                completion_token_count = len(text.completion_portion.split())
+                kwargs["max_tokens"] = completion_token_count
+            else:
+                input_content = text.content
+
             # Format prompt with text and parameters
+            params_dict = {param: kwargs.get(param) for param in template.parameters}
             prompt = template.template.format(
-                text=text.content,
-                **template.parameters,
-                **kwargs
+                text=input_content,
+                **params_dict
             )
             
             # Generate completion with retries
@@ -112,8 +141,20 @@ class TestRunner:
             
             execution_time = time.time() - start_time
             
+            # Create a dictionary representation of the template with datetime converted to ISO format
+            template_dict = {
+                "name": template.name,
+                "version": template.version,
+                "template": template.template,
+                "parameters": template.parameters,
+                "metadata": template.metadata,
+                "created_at": template.created_at.isoformat() if template.created_at else None,
+                "template_type": template.template_type.value
+            }
+            
             return PromptResult(
-                prompt_template=template,
+                prompt_template=template_dict,
+                prompt_string=str(prompt),
                 input_text=text,
                 output_text=output,
                 metadata={

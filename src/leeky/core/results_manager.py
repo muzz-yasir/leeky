@@ -124,13 +124,22 @@ class ResultsManager:
                 "end_time": result.end_time.isoformat(),
                 "results": [
                     {
-                        "template_name": r.prompt_template.name,
-                        "template_version": r.prompt_template.version,
-                        "input_text": r.input_text.content,
+                        "template": r.prompt_template,
+                        "input_text": {
+                            "content": r.input_text.content,
+                            "source_id": r.input_text.source_id,
+                            "metadata": r.input_text.metadata,
+                            "timestamp": r.input_text.timestamp.isoformat(),
+                            "context_portion": r.input_text.context_portion,
+                            "completion_portion": r.input_text.completion_portion,
+                            "split_metadata": r.input_text.split_metadata
+                        },
                         "output_text": r.output_text,
+                        "prompt_string": r.prompt_string,
                         "metadata": r.metadata,
                         "timestamp": r.timestamp.isoformat(),
-                        "execution_time": r.execution_time
+                        "execution_time": r.execution_time,
+                        "completion_comparison": r.completion_comparison if hasattr(r, 'completion_comparison') else None
                     }
                     for r in result.prompt_results
                 ]
@@ -151,13 +160,21 @@ class ResultsManager:
         try:
             rows = []
             for r in result.prompt_results:
+                # Flatten template metadata into columns
+                template_metadata = {
+                    f"template_{k}": v 
+                    for k, v in r.prompt_template.metadata.items()
+                }
+                
                 rows.append({
                     "template_name": r.prompt_template.name,
                     "template_version": r.prompt_template.version,
                     "input_text": r.input_text.content,
                     "output_text": r.output_text,
+                    "prompt_string": r.prompt_string,
                     "execution_time": r.execution_time,
                     "timestamp": r.timestamp.isoformat(),
+                    **template_metadata,
                     **r.metadata
                 })
             

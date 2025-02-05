@@ -13,6 +13,10 @@ test_runner:
   sampling_strategy: "random"
   sampling_parameters:
     size: 10
+  text_splitting:
+    enabled: true
+    strategy: "ratio"  # Options: ratio, sentence, paragraph
+    split_ratio: 0.8     # Use 80% for context, 20% for completion comparison
 
 # Engine configuration
 engine:

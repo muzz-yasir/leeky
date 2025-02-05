@@ -23,6 +23,19 @@ class AnthropicEngine(CompletionEngine):
             "claude-instant-1": 100000
         }.get(model, 100000)
 
+    def _format_prompt_with_length_guidance(self, prompt: str, max_tokens: int) -> str:
+        """Add length guidance to the prompt.
+        
+        Args:
+            prompt: Original prompt
+            max_tokens: Target number of tokens
+            
+        Returns:
+            Modified prompt with length guidance
+        """
+        guidance = f"\n\nPlease provide a response that is approximately {max_tokens} words in length."
+        return prompt + guidance
+
     async def complete(self, prompt: str, **kwargs) -> str:
         """Generate completion using Anthropic API.
         
@@ -34,6 +47,11 @@ class AnthropicEngine(CompletionEngine):
             str: Generated completion.
         """
         params = {**self.default_params, **kwargs}
+        
+        # Add length guidance if max_tokens is specified
+        if params.get("max_tokens"):
+            prompt = self._format_prompt_with_length_guidance(prompt, params["max_tokens"])
+            
         response = await self.client.messages.create(
             model=self._model,
             messages=[{"role": "user", "content": prompt}],
@@ -61,6 +79,6 @@ class AnthropicEngine(CompletionEngine):
         """Get default parameters."""
         return {
             "temperature": 0.7,
-            "max_tokens": None,  # Let Anthropic handle token limit
+            "max_tokens": None,  # Will be set based on completion portion length
             "top_p": 1.0
         }

@@ -25,6 +25,19 @@ class OpenAIEngine(CompletionEngine):
             "gpt-4-32k": 32768
         }.get(model, 4096)
 
+    def _format_prompt_with_length_guidance(self, prompt: str, max_tokens: int) -> str:
+        """Add length guidance to the prompt.
+        
+        Args:
+            prompt: Original prompt
+            max_tokens: Target number of tokens
+            
+        Returns:
+            Modified prompt with length guidance
+        """
+        guidance = f"\n\nPlease provide a response that is approximately {max_tokens} words in length."
+        return prompt + guidance
+
     async def complete(self, prompt: str, **kwargs) -> str:
         """Generate completion using OpenAI API.
         
@@ -36,6 +49,11 @@ class OpenAIEngine(CompletionEngine):
             str: Generated completion.
         """
         params = {**self.default_params, **kwargs}
+        
+        # Add length guidance if max_tokens is specified
+        if params.get("max_tokens"):
+            prompt = self._format_prompt_with_length_guidance(prompt, params["max_tokens"])
+            
         response = await self.client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model=self._model,
@@ -58,7 +76,7 @@ class OpenAIEngine(CompletionEngine):
         """Get default parameters."""
         return {
             "temperature": 0.7,
-            "max_tokens": None,  # Let OpenAI handle token limit
+            "max_tokens": None,  # Will be set based on completion portion length
             "top_p": 1.0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0

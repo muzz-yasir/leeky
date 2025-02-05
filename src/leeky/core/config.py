@@ -44,6 +44,11 @@ class Configuration:
                 "timeout": 30.0,
                 "sampling_strategy": "random",
                 "sampling_parameters": {},
+                "text_splitting": {
+                    "enabled": True,
+                    "strategy": "sentence",
+                    "split_ratio": 0.8
+                },
             },
             "engine": {
                 "engine_type": "openai",
@@ -149,12 +154,22 @@ class Configuration:
         """
         try:
             test_data = self.config_data["test_runner"]
+            # Get text splitting config with defaults
+            text_splitting = {
+                "enabled": True,
+                "strategy": "sentence",
+                "split_ratio": 0.8
+            }
+            if "text_splitting" in test_data:
+                text_splitting.update(test_data["text_splitting"])
+
             return TestConfig(
                 batch_size=test_data["batch_size"],
                 max_retries=test_data["max_retries"],
                 timeout=float(test_data["timeout"]),
                 sampling_strategy=test_data["sampling_strategy"],
-                sampling_parameters=test_data.get("sampling_parameters", {})
+                sampling_parameters=test_data.get("sampling_parameters", {}),
+                text_splitting=text_splitting
             )
         except KeyError as e:
             raise ConfigurationError(f"Missing required test config key: {str(e)}")

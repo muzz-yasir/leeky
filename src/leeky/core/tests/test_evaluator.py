@@ -3,7 +3,7 @@
 import pytest
 from datetime import datetime
 from typing import List, Sequence
-from leeky.core.evaluator import Evaluator, BaseMetric, TokenMatchMetric
+from leeky.core.evaluator import Evaluator, BaseMetric, TokenMatchMetric, LCSMetric
 from leeky.core.types import (
     TextSource,
     PromptTemplate,
@@ -142,6 +142,93 @@ def test_get_statistics(evaluator, batch_result):
         assert "min" in metric_stats
         assert "max" in metric_stats
         assert metric_stats["mean"] == 0.5  # Mock metric always returns 0.5
+
+def test_lcs_metric():
+    """Test the LCS metric implementation."""
+    metric = LCSMetric()
+    
+    template = PromptTemplate(
+        template="Test",
+        name="test",
+        version="1.0",
+        parameters={},
+        metadata={},
+        created_at=datetime.now()
+    )
+    
+    # Create a text source with completion portion
+    text = TextSource(
+        content="The quick brown fox jumps over the lazy dog",
+        source_id="test",
+        metadata={},
+        timestamp=datetime.now()
+    )
+    text.completion_portion = "jumps over the lazy dog"
+    
+    # Test exact match
+    result = PromptResult(
+        prompt_template=template,
+        input_text=text,
+        output_text="jumps over the lazy dog",
+        metadata={},
+        timestamp=datetime.now(),
+        execution_time=0.1
+    )
+    evaluation = metric.evaluate(result)
+    assert evaluation.score == 1.0
+    assert evaluation.details["lcs_length"] == len(text.completion_portion.split())
+    # Compare normalized words
+    expected_words = [w.strip('.,!?()[]{}""\'\'').lower() for w in text.completion_portion.split()]
+    actual_words = [w.strip('.,!?()[]{}""\'\'').lower() for w in evaluation.details["lcs"].split()]
+    assert actual_words == expected_words
+    
+    # Test partial match
+    result = PromptResult(
+        prompt_template=template,
+        input_text=text,
+        output_text="jumps quickly over a lazy dog",
+        metadata={},
+        timestamp=datetime.now(),
+        execution_time=0.1
+    )
+    evaluation = metric.evaluate(result)
+    assert 0 < evaluation.score < 1.0
+    assert evaluation.details["lcs"] == "jumps over lazy dog"
+    
+    # Test no match
+    result = PromptResult(
+        prompt_template=template,
+        input_text=text,
+        output_text="something completely different here",
+        metadata={},
+        timestamp=datetime.now(),
+        execution_time=0.1
+    )
+    evaluation = metric.evaluate(result)
+    assert evaluation.score == 0.0
+    assert evaluation.details["lcs_length"] == 0
+    
+    # Test empty completion
+    text_empty = TextSource(
+        content="Empty test",
+        source_id="test",
+        metadata={},
+        timestamp=datetime.now()
+    )
+    text_empty.completion_portion = ""
+    
+    result = PromptResult(
+        prompt_template=template,
+        input_text=text_empty,
+        output_text="any output",
+        metadata={},
+        timestamp=datetime.now(),
+        execution_time=0.1
+    )
+    evaluation = metric.evaluate(result)
+    assert evaluation.score == 0.0
+    assert "error" in evaluation.details
+
 
 def test_token_match_metric():
     """Test the token match metric implementation."""

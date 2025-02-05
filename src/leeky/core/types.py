@@ -29,11 +29,59 @@ class EvaluationError(LeekyError):
 # Common types
 @dataclass
 class TextSource:
-    """Represents a source of text data with metadata."""
+    """Represents a source of text data with metadata and optional splitting for completion tasks."""
     content: str
     source_id: str
     metadata: Dict[str, Any]
     timestamp: datetime
+    context_portion: Optional[str] = None
+    completion_portion: Optional[str] = None
+    split_metadata: Optional[Dict[str, Any]] = None
+
+    def split_for_completion(self, split_ratio: float = 0.8, strategy: str = "ratio") -> None:
+        """Split the content into context and completion portions.
+        
+        Args:
+            split_ratio: Ratio of text to use as context (0.0 to 1.0)
+            strategy: Splitting strategy ('ratio', 'sentence', 'paragraph')
+            
+        Raises:
+            ValueError: If split_ratio is not between 0 and 1
+        """
+        if not 0 < split_ratio < 1:
+            raise ValueError("split_ratio must be between 0 and 1")
+            
+        if strategy == "ratio":
+            split_point = int(len(self.content) * split_ratio)
+            self.context_portion = self.content[:split_point]
+            self.completion_portion = self.content[split_point:]
+            
+        elif strategy == "sentence":
+            sentences = self.content.split(". ")
+            split_point = int(len(sentences) * split_ratio)
+            self.context_portion = ". ".join(sentences[:split_point]) + "."
+            self.completion_portion = ". ".join(sentences[split_point:])
+            
+        elif strategy == "paragraph":
+            paragraphs = self.content.split("\n\n")
+            split_point = int(len(paragraphs) * split_ratio)
+            self.context_portion = "\n\n".join(paragraphs[:split_point])
+            self.completion_portion = "\n\n".join(paragraphs[split_point:])
+            
+        else:
+            raise ValueError(f"Unknown splitting strategy: {strategy}")
+            
+        self.split_metadata = {
+            "strategy": strategy,
+            "split_ratio": split_ratio,
+            "context_length": len(self.context_portion),
+            "completion_length": len(self.completion_portion)
+        }
+
+class TemplateType(Enum):
+    """Types of prompt templates."""
+    INSTRUCTION = "instruction"
+    JAILBREAK = "jailbreak"
 
 @dataclass
 class PromptTemplate:
@@ -44,16 +92,19 @@ class PromptTemplate:
     parameters: Dict[str, Any]
     metadata: Dict[str, Any]
     created_at: datetime
+    template_type: TemplateType = TemplateType.INSTRUCTION
 
 @dataclass
 class PromptResult:
     """Represents the result of applying a prompt template."""
-    prompt_template: PromptTemplate
+    prompt_template: Dict[str, Any]
+    prompt_string: str
     input_text: TextSource
     output_text: str
     metadata: Dict[str, Any]
     timestamp: datetime
     execution_time: float
+    completion_comparison: Optional[Dict[str, Any]] = None
 
 @dataclass
 class EvaluationMetric:
@@ -93,6 +144,7 @@ class EngineConfig:
     parameters: Dict[str, Any]
 
 @dataclass
+@dataclass
 class TestConfig:
     """Configuration for test execution."""
     batch_size: int
@@ -100,3 +152,4 @@ class TestConfig:
     timeout: float
     sampling_strategy: str
     sampling_parameters: Dict[str, Any]
+    text_splitting: Dict[str, Any] = None
