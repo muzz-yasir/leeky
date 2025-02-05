@@ -257,7 +257,8 @@ def main():
     )
     
     if page == "Text Completion":
-        st.write("Test if an LLM can complete your text")
+        st.header("Text Completion")
+        st.write("Test if an LLM can complete your text. Can you find the optimal chunking and sentence split to get the best completion?")
         
         # Initialize session state
         if 'input_text' not in st.session_state:
