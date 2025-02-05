@@ -24,6 +24,32 @@ poetry install
 poetry run python -m spacy download en_core_web_lg
 ```
 
+## Streamlit App Deployment
+
+### Local Development
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the app locally
+streamlit run app.py
+```
+
+### Deploying to Streamlit Cloud
+
+1. Fork this repository to your GitHub account
+2. Visit [Streamlit Cloud](https://streamlit.io/cloud)
+3. Click "New app" and select your forked repository
+4. In the deployment settings:
+   - Main file path: Enter `app.py` (this is the file in the root directory that contains your Streamlit app)
+   - Add your OpenAI API key as a secret:
+     - Name: `OPENAI_API_KEY`
+     - Value: Your OpenAI API key
+5. Click "Deploy"
+
+The app requires the following environment variables:
+- `OPENAI_API_KEY`: Your OpenAI API key
+
 ## Quick Start
 
 1. Create a configuration file (`config.yaml`):

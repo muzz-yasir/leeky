@@ -19,10 +19,11 @@ def render_decop_ui(engine: CompletionEngine):
     Args:
         engine: LLM engine instance to use for analysis
     """
-    st.title("Training Data Detector")
+    st.title("Data Extraction from ChatGPT Output (DE-COP)")
     st.write("""
-    This tool implements the DE-COP method to detect if content was likely used in LLM training.
-    Provide URLs to potentially contaminated content and known clean content for comparison.
+    Provide URLs to potentially contaminated content and known clean content for comparison. 
+    We will quiz ChatGPT with paraphrases of the content to see if it can correctly identify true extracts.
+    A higher accuracy for suspect URLs indicates that the model has seen this content before.
     """)
     
     # Initialize session state

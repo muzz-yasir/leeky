@@ -9,16 +9,14 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-# Add project root to Python path
+# Add src directory to Python path
 project_root = Path(__file__).resolve().parent
-if (project_root / 'src' / 'leeky').exists():
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
-elif (project_root.parent / 'src' / 'leeky').exists():
-    if str(project_root.parent) not in sys.path:
-        sys.path.insert(0, str(project_root.parent))
+src_path = project_root / 'src'
+if src_path.exists():
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
 else:
-    st.error("Could not find leeky package. Make sure you're running from the correct directory.")
+    st.error("Could not find src directory. Make sure the project structure is correct.")
     st.stop()
 
 try:
@@ -116,21 +114,13 @@ def init_components():
     try:
         prompt_manager = PromptManager()
         
-        # Try to load templates from project root or parent directory
-        instruction_path = None
-        jailbreak_path = None
+        # Load templates from prompts directory
+        prompts_dir = project_root / 'prompts'
+        instruction_path = prompts_dir / 'instruction_templates.json'
+        jailbreak_path = prompts_dir / 'jailbreak_templates.json'
         
-        # Check project root first
-        if (project_root / 'prompts').exists():
-            instruction_path = project_root / 'prompts' / 'instruction_templates.json'
-            jailbreak_path = project_root / 'prompts' / 'jailbreak_templates.json'
-        # Then check parent directory
-        elif (project_root.parent / 'prompts').exists():
-            instruction_path = project_root.parent / 'prompts' / 'instruction_templates.json'
-            jailbreak_path = project_root.parent / 'prompts' / 'jailbreak_templates.json'
-        
-        if not instruction_path or not jailbreak_path:
-            st.error("Template files not found in expected locations")
+        if not instruction_path.exists() or not jailbreak_path.exists():
+            st.error("Template files not found. Make sure the prompts directory contains required templates.")
             st.stop()
             
         try:
@@ -263,7 +253,7 @@ def main():
     # Navigation
     page = st.sidebar.radio(
         "Select Feature",
-        ["Text Completion", "Training Data Detector"]
+        ["Text Completion", "Data Contamination Quiz"]
     )
     
     if page == "Text Completion":
@@ -455,7 +445,7 @@ def main():
                 except Exception as e:
                     st.error(f"Error during analysis: {str(e)}")
 
-    elif page == "Training Data Detector":
+    elif page == "Data Contamination Quiz":
         render_decop_ui(engine)
 
 if __name__ == "__main__":
