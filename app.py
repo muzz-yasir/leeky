@@ -253,7 +253,7 @@ def main():
     # Navigation
     page = st.sidebar.radio(
         "Select Feature",
-        ["Text Completion", "Data Contamination Quiz"]
+        ["Text Completion", "Data Contamination Detection"]
     )
     
     if page == "Text Completion":
@@ -445,7 +445,7 @@ def main():
                 except Exception as e:
                     st.error(f"Error during analysis: {str(e)}")
 
-    elif page == "Data Contamination Quiz":
+    elif page == "Data Contamination Detection":
         render_decop_ui(engine)
 
 if __name__ == "__main__":
