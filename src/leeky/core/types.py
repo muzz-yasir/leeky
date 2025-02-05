@@ -128,7 +128,6 @@ class PromptTemplate:
     version: str
     parameters: List[str]
     metadata: Dict[str, Any]
-    created_at: datetime
     template_type: TemplateType = TemplateType.INSTRUCTION
 
 @dataclass

@@ -63,7 +63,6 @@ class PromptManager:
             version=version,
             parameters=params,
             metadata=metadata or {},
-            created_at=datetime.now(),
             template_type=template_type
         )
         
@@ -155,7 +154,6 @@ class PromptManager:
             version=version or current.version,
             parameters=params,
             metadata={**current.metadata, **(metadata or {})},
-            created_at=current.created_at,
             template_type=template_type
         )
         
@@ -283,7 +281,6 @@ class PromptManager:
                     "version": t.version,
                     "parameters": t.parameters,
                     "metadata": t.metadata,
-                    "created_at": t.created_at.isoformat(),
                     "performance": self._performance_metrics.get(name, [])
                 }
                 for name, t in self._instruction_templates.items()
@@ -299,7 +296,6 @@ class PromptManager:
                     "version": t.version,
                     "parameters": t.parameters,
                     "metadata": t.metadata,
-                    "created_at": t.created_at.isoformat(),
                     "performance": self._performance_metrics.get(name, [])
                 }
                 for name, t in self._jailbreak_templates.items()
@@ -332,17 +328,20 @@ class PromptManager:
                 params = t_data["parameters"]
                 if isinstance(params, dict):
                     params = list(params.keys())
-                template = PromptTemplate(
-                    template=t_data["template"],
-                    name=name,
-                    version=t_data["version"],
-                    parameters=params,
-                    metadata=t_data["metadata"],
-                    created_at=datetime.fromisoformat(t_data["created_at"]),
-                    template_type=TemplateType.INSTRUCTION
-                )
-                self._instruction_templates[name] = template
-                self._performance_metrics[name] = t_data.get("performance", [])
+                try:
+                    template = PromptTemplate(
+                        template=t_data["template"],
+                        name=name,
+                        version=t_data["version"],
+                        parameters=params,
+                        metadata=t_data["metadata"],
+                            template_type=TemplateType.INSTRUCTION
+                    )
+                    self._instruction_templates[name] = template
+                    self._performance_metrics[name] = t_data.get("performance", [])
+                except Exception as e:
+                    logger.error(f"Failed to create instruction template {name}: {str(e)}")
+                    raise PromptError(f"Failed to create instruction template {name}: {str(e)}")
                 
             # Load jailbreak templates
             with open(jailbreak_path, 'r', encoding='utf-8') as f:
@@ -351,21 +350,24 @@ class PromptManager:
             self._jailbreak_templates.clear()
             
             for name, t_data in jailbreak_data.items():
-                # Convert parameters to list if it's not already
-                params = t_data["parameters"]
-                if isinstance(params, dict):
-                    params = list(params.keys())
-                template = PromptTemplate(
-                    template=t_data["template"],
-                    name=name,
-                    version=t_data["version"],
-                    parameters=params,
-                    metadata=t_data["metadata"],
-                    created_at=datetime.fromisoformat(t_data["created_at"]),
-                    template_type=TemplateType.JAILBREAK
-                )
-                self._jailbreak_templates[name] = template
-                self._performance_metrics[name] = t_data.get("performance", [])
+                try:
+                    # Convert parameters to list if it's not already
+                    params = t_data["parameters"]
+                    if isinstance(params, dict):
+                        params = list(params.keys())
+                    template = PromptTemplate(
+                        template=t_data["template"],
+                        name=name,
+                        version=t_data["version"],
+                        parameters=params,
+                        metadata=t_data["metadata"],
+                            template_type=TemplateType.JAILBREAK
+                    )
+                    self._jailbreak_templates[name] = template
+                    self._performance_metrics[name] = t_data.get("performance", [])
+                except Exception as e:
+                    logger.error(f"Failed to create jailbreak template {name}: {str(e)}")
+                    raise PromptError(f"Failed to create jailbreak template {name}: {str(e)}")
         except json.JSONDecodeError as e:
             raise PromptError(f"Failed to parse template files: {str(e)}")
         except Exception as e:
