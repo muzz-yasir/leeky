@@ -165,50 +165,26 @@ def generate_prompt_combinations(text_source: TextSource) -> List[Tuple[str, str
     """Generate all combinations of jailbreak and instruction prompts."""
     combinations = []
     instruction_templates = prompt_manager.get_all_templates(TemplateType.INSTRUCTION)
-    jailbreak_templates = prompt_manager.get_all_templates(TemplateType.JAILBREAK)
     
-    if not instruction_templates:
-        st.error("No instruction templates found.")
-        st.stop()
-        
-    if not jailbreak_templates:
-        st.warning("No jailbreak templates found. Using instruction templates only.")
-        # Use each instruction template without a jailbreak
-        for i_template in instruction_templates:
-            # Skip templates that require source if source_name is not provided
-            if isinstance(i_template.parameters, list) and "source" in i_template.parameters and not text_source.source_name:
-                #st.warning(f"Skipping template {i_template.name} as it requires source parameter")
-                continue
-                
-            format_args = {"text": text_source.context_portion}
-            if text_source.source_name and isinstance(i_template.parameters, list) and "source" in i_template.parameters:
-                format_args["source"] = text_source.source_name
+    # Use instruction templates without jailbreak
+    for i_template in instruction_templates:
+        # Skip templates that require source if source_name is not provided
+        if isinstance(i_template.parameters, list) and "source" in i_template.parameters and not text_source.source_name:
+            continue
+            
+        format_args = {"text": text_source.context_portion}
+        if text_source.source_name and isinstance(i_template.parameters, list) and "source" in i_template.parameters:
+            format_args["source"] = text_source.source_name
+        try:
             prompt = i_template.template.format(**format_args)
             combinations.append((prompt, "none", i_template.name))
-    else:
-        # Use all combinations of jailbreak and instruction templates
-        for j_template in jailbreak_templates:
-            for i_template in instruction_templates:
-                try:
-                    prompt = prompt_manager.combine_templates(i_template.name, j_template.name)
-                    # Skip templates that require source if source_name is not provided
-                    if isinstance(i_template.parameters, list) and "source" in i_template.parameters and not text_source.source_name:
-                        #st.warning(f"Skipping template {i_template.name} as it requires source parameter")
-                        continue
-                        
-                    format_args = {"text": text_source.context_portion}
-                    if text_source.source_name and isinstance(i_template.parameters, list) and "source" in i_template.parameters:
-                        format_args["source"] = text_source.source_name
-                    prompt = prompt.format(**format_args)
-                    combinations.append((prompt, j_template.name, i_template.name))
-                except Exception as e:
-                    st.warning(f"Failed to combine templates {j_template.name} + {i_template.name}: {str(e)}")
-                    continue
+        except Exception:
+            continue
     
     if not combinations:
         st.error("No valid prompt combinations could be generated.")
         st.stop()
-        
+    
     return combinations
 
 def calculate_similarity(text1: str, text2: str, metric: str) -> float:
@@ -386,24 +362,24 @@ def main():
             
             url = st.text_input("Enter URL (a news article or blog post works best)", value=st.session_state.url)
             
-            # Only scrape if URL changed
-            if url != st.session_state.url:
+            # Always try to scrape if URL is provided
+            if url:
+                # Update session state
                 st.session_state.url = url
                 st.session_state.url_text = None
                 st.session_state.url_error = None
                 
-                if url:
-                    try:
-                        with st.spinner("Fetching content from URL..."):
-                            scraper = ArticleScraper()
-                            st.session_state.url_text = scraper.scrape_url(url)
-                            if not st.session_state.url_text:
-                                st.session_state.url_error = "No content found at the provided URL"
-                            else:
-                                source_name = url  # Use URL as source name
-                                st.session_state.source_name = source_name  # Update session state
-                    except Exception as e:
-                        st.session_state.url_error = f"Error: {str(e)}"
+                try:
+                    with st.spinner("Fetching content from URL..."):
+                        scraper = ArticleScraper()
+                        st.session_state.url_text = scraper.scrape_url(url)
+                        if not st.session_state.url_text:
+                            st.session_state.url_error = "No content found at the provided URL"
+                        else:
+                            source_name = url  # Use URL as source name
+                            st.session_state.source_name = source_name  # Update session state
+                except Exception as e:
+                    st.session_state.url_error = f"Error: {str(e)}"
             
             # Show any errors
             if st.session_state.url_error:
@@ -421,7 +397,7 @@ def main():
         
         # Show parameters and analyze button after clicking Start Analysis
         if st.session_state.get('show_params', False):
-            if not text:
+            if not text or not text.strip():
                 st.error("Please enter a URL or text first")
                 return
             st.subheader("Analysis Parameters")
