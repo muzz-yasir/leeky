@@ -248,7 +248,111 @@ def generate_colored_diff(completion: str, generated: str) -> str:
     return ' '.join(html_parts)
 
 def main():
-    st.title("Have I Been Trained On?")
+    # Custom CSS
+    st.markdown("""
+        <style>
+        .main {
+            background-color: #1e1e1e;
+            padding: 2rem;
+        }
+        .stApp {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4CAF50;
+            font-size: 2.8rem !important;
+            font-weight: 700 !important;
+            margin-bottom: 1.5rem !important;
+            font-family: 'Helvetica Neue', sans-serif;
+        }
+        .stTextInput > div > div > input, .stTextArea > div > div > textarea {
+            background-color: #2d2d2d;
+            color: #ffffff;
+            border: 1px solid #3b3b3b;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 1rem;
+        }
+        .stButton > button {
+            background-color: #2e7d32;
+            color: white;
+            border-radius: 8px;
+            padding: 0.6rem 2rem;
+            font-weight: 500;
+            border: none;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+        .stButton > button:hover {
+            background-color: #1b5e20;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .stProgress > div > div > div {
+            background-color: #2e7d32;
+        }
+        .stSlider > div > div > div > div {
+            background-color: #2e7d32;
+        }
+        .stRadio > div {
+            padding: 1rem;
+            background: transparent;
+            border-radius: 8px;
+        }
+        .stRadio > div > div > div > label {
+            color: #ffffff !important;
+        }
+        .preview-box {
+            padding: 15px;
+            background-color: #262730;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid #3b3b3b;
+        }
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #1e1e1e;
+            padding: 1rem;
+            text-align: center;
+            border-top: 1px solid #3b3b3b;
+            font-size: 0.9rem;
+            z-index: 100;
+        }
+        .footer a {
+            color: #4CAF50;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        .stSelectbox > div > div {
+            background-color: #2d2d2d;
+            color: #ffffff;
+        }
+        .stNumberInput > div > div > input {
+            background-color: #2d2d2d;
+            color: #ffffff;
+            border: 1px solid #3b3b3b;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("Have You Been Trained On?")
+    
+    # Add footer
+    st.markdown(
+        """
+        <div class="footer">
+            Created by <a href="https://discretedeliberations.xyz" target="_blank">Mustafa Yasir</a> 
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     
     # Navigation
     page = st.sidebar.radio(
@@ -370,7 +474,7 @@ def main():
                         context_preview = temp_source.context_portion[:200] + "..." if len(temp_source.context_portion) > 200 else temp_source.context_portion
                         completion_preview = temp_source.completion_portion[:200] + "..." if len(temp_source.completion_portion) > 200 else temp_source.completion_portion
                         preview_html = f"""
-                            <div style="padding:10px; background-color:#262730; border-radius:5px;">
+                            <div class="preview-box">
                                 <span style="color:#4CAF50">{context_preview}</span>
                                 <span style="color:#FFD700"> | </span>
                                 <span style="color:#FF4B4B">{completion_preview}</span>
