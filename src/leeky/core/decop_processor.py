@@ -1,10 +1,11 @@
 """Core implementation of DE-COP training data detection."""
 
-import asyncio
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Callable
 from itertools import permutations
+import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import scipy.stats as stats
 from dataclasses import asdict
 import tiktoken
@@ -107,83 +108,100 @@ class DecopProcessor:
             
         return passages
 
+    def _generate_paraphrases_single(self, passage: DecopPassage) -> None:
+        """Generate paraphrases for a single passage."""
+        try:
+            # Check cache first
+            if self.cache_dir:
+                cache_key = str(hash(passage.text))
+                cache_file = os.path.join(self.cache_dir, f"{cache_key}.json")
+                if os.path.exists(cache_file):
+                    with open(cache_file, 'r') as f:
+                        cached_data = json.load(f)
+                        passage.paraphrases = cached_data['paraphrases']
+                        return
+
+            prompt = f"""Please generate 4 different paraphrased versions of the following text. 
+            Maintain the same meaning and level of detail, but vary the wording and structure significantly.
+            Keep approximately the same length. Do not number the paraphrases.
+            Each paraphrase must be unique and meaningfully different from the others.
+            
+            Text to paraphrase:
+            {passage.text}
+            
+            Generate 4 unique and distinct paraphrases without numbering, separated by [SEP]."""
+            
+            response = self.engine.sync_complete(
+                prompt,
+                temperature=0.1,
+                max_tokens=self._count_tokens(passage.text) * 3 * 2
+            )
+            
+            # Process and validate paraphrases
+            paraphrases = [p.strip() for p in response.split("[SEP]") if p.strip()]
+            valid_paraphrases = [p for p in paraphrases if len(p) >= len(passage.text) * 0.3]
+            
+            attempts = 0
+            max_attempts = 3
+            while len(valid_paraphrases) < 3 and attempts < max_attempts:
+                attempts += 1
+                temperature = min(0.7 + (attempts * 0.1), 0.9)
+                
+                response = self.engine.sync_complete(
+                    prompt,
+                    temperature=temperature,
+                    max_tokens=self._count_tokens(passage.text) * (3 + attempts) * 2
+                )
+                additional_paraphrases = [p.strip() for p in response.split("[SEP]") if p.strip()]
+                valid_paraphrases.extend([p for p in additional_paraphrases if len(p) >= len(passage.text) * 0.3])
+                valid_paraphrases = list(set(valid_paraphrases))
+            
+            if len(valid_paraphrases) >= 3:
+                passage.paraphrases = valid_paraphrases[:3]
+            else:
+                # If we still don't have enough, take what we have and pad with modified originals
+                while len(valid_paraphrases) < 3:
+                    modified = passage.text.replace("the", "a").replace("is", "was").replace("are", "were")
+                    valid_paraphrases.append(modified)
+                passage.paraphrases = valid_paraphrases[:3]
+            
+            # Cache results
+            if self.cache_dir:
+                with open(cache_file, 'w') as f:
+                    json.dump({
+                        'text': passage.text,
+                        'paraphrases': passage.paraphrases
+                    }, f)
+                    
+        except Exception as e:
+            raise ValueError(f"Error generating paraphrases: {str(e)}")
+
     def _generate_paraphrases_batch(self, passages: List[DecopPassage], batch_size: int = 5) -> None:
-        """Generate paraphrases for multiple passages in batches.
+        """Generate paraphrases for multiple passages in parallel batches.
         
         Args:
             passages: List of passages to generate paraphrases for
             batch_size: Number of passages to process in each batch
         """
-        total_batches = (len(passages) + batch_size - 1) // batch_size
+        total = len(passages)
+        processed = 0
         
-        for batch_idx in range(0, len(passages), batch_size):
-            batch = passages[batch_idx:batch_idx + batch_size]
-            batch_num = (batch_idx // batch_size) + 1
+        # Process passages in parallel using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=batch_size) as executor:
+            futures = []
+            for passage in passages:
+                futures.append(executor.submit(self._generate_paraphrases_single, passage))
             
-            self._update_status(
-                ProcessingStage.GENERATING_PARAPHRASES,
-                batch_idx / len(passages),
-                f"Processing batch {batch_num}/{total_batches} ({len(batch)} passages)"
-            )
-            
-            for passage in batch:
+            # Wait for each batch to complete and update progress
+            for future in as_completed(futures):
                 try:
-                    # Check cache first
-                    cache_hit = False
-                    if self.cache_dir:
-                        cache_key = str(hash(passage.text))
-                        cache_file = os.path.join(self.cache_dir, f"{cache_key}.json")
-                        if os.path.exists(cache_file):
-                            with open(cache_file, 'r') as f:
-                                cached_data = json.load(f)
-                                passage.paraphrases = cached_data['paraphrases']
-                                cache_hit = True
-                                st.write(f"Using cached paraphrases for passage from {passage.source_url}")
-                                continue
-                    
-                    if not cache_hit:
-                        prompt = f"""Please generate 3 different paraphrased versions of the following text. 
-                        Maintain the same meaning and level of detail, but vary the wording and structure.
-                        Keep approximately the same length.
-                        
-                        Text to paraphrase:
-                        {passage.text}
-                        
-                        Generate 3 unique paraphrases, separated by [SEP]."""
-                        
-                        if hasattr(self.engine, 'sync_complete'):
-                            response = self.engine.sync_complete(
-                                prompt,
-                                temperature=0.1,
-                                max_tokens=self._count_tokens(passage.text) * 3 * 2
-                            )
-                        else:
-                            response = asyncio.run(self.engine.complete(
-                                prompt,
-                                temperature=0.1,
-                                max_tokens=self._count_tokens(passage.text) * 3 * 2
-                            ))
-                        
-                        paraphrases = [p.strip() for p in response.split("[SEP]")]
-                        passage.paraphrases = [p for p in paraphrases if p]
-                        
-                        # Cache results
-                        if self.cache_dir:
-                            with open(cache_file, 'w') as f:
-                                json.dump({
-                                    'text': passage.text,
-                                    'paraphrases': passage.paraphrases
-                                }, f)
-                        
-                        # Show the generated question
-                        st.write(f"Generated question for passage from {passage.source_url}:")
-                        st.write("Original:")
-                        st.write(passage.text[:200] + "..." if len(passage.text) > 200 else passage.text)
-                        st.write("Paraphrases:")
-                        for i, p in enumerate(passage.paraphrases, 1):
-                            st.write(f"{i}. {p[:200]}..." if len(p) > 200 else f"{i}. {p}")
-                        st.write("---")
-                        
+                    future.result()  # This will raise any exceptions that occurred
+                    processed += 1
+                    self._update_status(
+                        ProcessingStage.GENERATING_PARAPHRASES,
+                        processed / total,
+                        f"Generated paraphrases for {processed}/{total} passages"
+                    )
                 except Exception as e:
                     self._update_status(
                         ProcessingStage.ERROR,
@@ -191,34 +209,87 @@ class DecopProcessor:
                         f"Error generating paraphrases: {str(e)}",
                         error=str(e)
                     )
+            
+            # Show example for first passage only
+            if passages:
+                st.write("Example paraphrase generation:")
+                st.write(f"Original: {passages[0].text[:100]}..." if len(passages[0].text) > 100 else passages[0].text)
+                if passages[0].paraphrases:
+                    st.write(f"Paraphrase: {passages[0].paraphrases[0][:100]}..." if len(passages[0].paraphrases[0]) > 100 else passages[0].paraphrases[0])
 
     def _generate_quiz_permutations(
         self,
-        passage: DecopPassage
+        passage: DecopPassage,
+        max_attempts: int = 3,
+        num_permutations: int = 8
     ) -> List[QuizPermutation]:
-        """Generate all possible quiz permutations for a passage.
+        """Generate a subset of quiz permutations for a passage.
         
         Args:
             passage: Passage with original text and paraphrases
+            max_attempts: Maximum attempts to generate valid permutations
+            num_permutations: Number of permutations to generate (default 8)
             
         Returns:
-            List of all possible quiz permutations
+            List of quiz permutations
         """
-        options = [passage.text] + passage.paraphrases
-        permutation_indices = list(permutations(range(len(options))))
-        
-        quiz_permutations = []
-        for perm in permutation_indices:
-            correct_index = perm.index(0)  # Index of original passage in this permutation
-            shuffled_options = [options[i] for i in perm]
-            
-            quiz = QuizPermutation(
-                question=f"Which of the following passages is verbatim from {passage.source_url}?",
-                options=shuffled_options,
-                correct_index=correct_index,
-                source_passage=passage
-            )
-            quiz_permutations.append(quiz)
+        attempts = 0
+        while attempts < max_attempts:
+            try:
+                # Ensure we have exactly 4 options (original + 3 paraphrases)
+                if len(passage.paraphrases) < 3:
+                    raise ValueError("Not enough paraphrases available")
+                
+                options = [passage.text] + passage.paraphrases[:3]
+                if len(options) != 4:
+                    raise ValueError(f"Invalid number of options: {len(options)}")
+                
+                # Get all possible permutations
+                all_perms = list(permutations(range(len(options))))
+                
+                # Initialize quiz permutations list
+                quiz_permutations = []
+                
+                # Track correct answer positions to ensure good distribution
+                position_counts = {i: 0 for i in range(4)}
+                
+                # Randomly sample permutations while maintaining position balance
+                while len(quiz_permutations) < num_permutations and all_perms:
+                    # Get a random permutation
+                    perm_idx = random.randrange(len(all_perms))
+                    perm = all_perms.pop(perm_idx)
+                    
+                    correct_index = perm.index(0)  # Index of original passage
+                    
+                    # Check if this position is overrepresented
+                    if len(quiz_permutations) >= 4:
+                        max_per_position = (num_permutations + 3) // 4  # Allow slight imbalance
+                        if position_counts[correct_index] >= max_per_position:
+                            continue
+                    
+                    # Create quiz and add to list
+                    shuffled_options = [options[i] for i in perm]
+                    quiz = QuizPermutation(
+                        question=f"Which of the following passages appears in the original source?",
+                        options=shuffled_options,
+                        correct_index=correct_index,
+                        source_passage=passage
+                    )
+                    quiz_permutations.append(quiz)
+                    position_counts[correct_index] += 1
+                
+                if not quiz_permutations:
+                    raise ValueError("No valid quiz permutations generated")
+                
+                return quiz_permutations
+                
+            except Exception as e:
+                attempts += 1
+                if attempts >= max_attempts:
+                    raise ValueError(f"Failed to generate valid quiz after {max_attempts} attempts: {str(e)}")
+                
+                # Try to regenerate paraphrases
+                self._generate_paraphrases_batch([passage], batch_size=1)
             
         return quiz_permutations
 
@@ -250,13 +321,14 @@ class DecopProcessor:
                     quizzes = self._generate_quiz_permutations(passage)
                     responses = []
                     
-                    # Show one example quiz for this passage
-                    example_quiz = quizzes[0]  # Take first permutation as example
-                    st.write(f"Testing passage from {passage.source_url}:")
-                    st.write(example_quiz.question)
-                    for i, opt in enumerate(['A', 'B', 'C', 'D']):
-                        st.write(f"{opt}) {example_quiz.options[i][:200]}..." if len(example_quiz.options[i]) > 200 else f"{opt}) {example_quiz.options[i]}")
-                    st.write("---")
+                    # Show only one example quiz for the first passage
+                    if batch_idx == 0 and passage == passages[0]:
+                        example_quiz = quizzes[0]
+                        st.write("Example quiz generation:")
+                        st.write(example_quiz.question)
+                        for i, opt in enumerate(['A', 'B', 'C', 'D']):
+                            text = example_quiz.options[i]
+                            st.write(f"{opt}) {text[:100]}..." if len(text) > 100 else f"{opt}) {text}")
                     
                     # Process all permutations
                     for quiz in quizzes:
@@ -272,10 +344,7 @@ Provide your confidence level (0-100) after your answer, separated by a comma.
 Example response format: "A, 85" """
 
                         start_time = datetime.now()
-                        if hasattr(self.engine, 'sync_complete'):
-                            response = self.engine.sync_complete(prompt, temperature=0.1)
-                        else:
-                            response = asyncio.run(self.engine.complete(prompt, temperature=0.1))
+                        response = self.engine.sync_complete(prompt, temperature=0.1)
                         duration = (datetime.now() - start_time).total_seconds()
 
                         try:
