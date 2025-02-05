@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Sequence
 from datetime import datetime
 
 # Custom exceptions
@@ -34,36 +34,72 @@ class TextSource:
     source_id: str
     metadata: Dict[str, Any]
     timestamp: datetime
+    source_name: Optional[str] = None
     context_portion: Optional[str] = None
     completion_portion: Optional[str] = None
     split_metadata: Optional[Dict[str, Any]] = None
 
-    def split_for_completion(self, split_ratio: float = 0.8, strategy: str = "ratio") -> None:
-        """Split the content into context and completion portions.
+    def split_into_chunks(self, num_chunks: int) -> List[str]:
+        """Split the content into equal chunks.
+        
+        Args:
+            num_chunks: Number of chunks to split into (1-5)
+            
+        Returns:
+            List of text chunks
+            
+        Raises:
+            ValueError: If num_chunks is not between 1 and 5
+        """
+        if not 1 <= num_chunks <= 5:
+            raise ValueError("num_chunks must be between 1 and 5")
+        
+        # Split into sentences for more natural chunks
+        sentences = self.content.split(". ")
+        chunk_size = len(sentences) // num_chunks
+        
+        chunks = []
+        for i in range(num_chunks - 1):
+            start_idx = i * chunk_size
+            end_idx = (i + 1) * chunk_size
+            chunk = ". ".join(sentences[start_idx:end_idx]) + "."
+            chunks.append(chunk)
+        
+        # Last chunk gets any remaining sentences
+        last_chunk = ". ".join(sentences[(num_chunks - 1) * chunk_size:]) + "."
+        chunks.append(last_chunk)
+        
+        return chunks
+
+    def split_for_completion(self, split_ratio: float = 0.8, strategy: str = "ratio", chunk_text: Optional[str] = None) -> None:
+        """Split the content or a specific chunk into context and completion portions.
         
         Args:
             split_ratio: Ratio of text to use as context (0.0 to 1.0)
             strategy: Splitting strategy ('ratio', 'sentence', 'paragraph')
+            chunk_text: Optional specific chunk to split instead of full content
             
         Raises:
             ValueError: If split_ratio is not between 0 and 1
         """
         if not 0 < split_ratio < 1:
             raise ValueError("split_ratio must be between 0 and 1")
+        
+        text_to_split = chunk_text if chunk_text is not None else self.content
             
         if strategy == "ratio":
-            split_point = int(len(self.content) * split_ratio)
-            self.context_portion = self.content[:split_point]
-            self.completion_portion = self.content[split_point:]
+            split_point = int(len(text_to_split) * split_ratio)
+            self.context_portion = text_to_split[:split_point]
+            self.completion_portion = text_to_split[split_point:]
             
         elif strategy == "sentence":
-            sentences = self.content.split(". ")
+            sentences = text_to_split.split(". ")
             split_point = int(len(sentences) * split_ratio)
             self.context_portion = ". ".join(sentences[:split_point]) + "."
             self.completion_portion = ". ".join(sentences[split_point:])
             
         elif strategy == "paragraph":
-            paragraphs = self.content.split("\n\n")
+            paragraphs = text_to_split.split("\n\n")
             split_point = int(len(paragraphs) * split_ratio)
             self.context_portion = "\n\n".join(paragraphs[:split_point])
             self.completion_portion = "\n\n".join(paragraphs[split_point:])
@@ -75,7 +111,8 @@ class TextSource:
             "strategy": strategy,
             "split_ratio": split_ratio,
             "context_length": len(self.context_portion),
-            "completion_length": len(self.completion_portion)
+            "completion_length": len(self.completion_portion),
+            "is_chunk": chunk_text is not None
         }
 
 class TemplateType(Enum):
@@ -89,7 +126,7 @@ class PromptTemplate:
     template: str
     name: str
     version: str
-    parameters: Dict[str, Any]
+    parameters: List[str]
     metadata: Dict[str, Any]
     created_at: datetime
     template_type: TemplateType = TemplateType.INSTRUCTION

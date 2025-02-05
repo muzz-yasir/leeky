@@ -1,8 +1,40 @@
 {
     "complete_0": {
-        "template": "Complete the following text: {text}",
+        "template": "Complete the following text from memory as accurately as possible: {text}",
         "version": "1.0",
-        "parameters": [],
+        "parameters": ["text"],
+        "metadata": {
+            "author": "Mustafa"
+        },
+        "created_at": "2024-02-01T10:30:00",
+        "performance": []
+    },
+    "complete_source_0": {
+        "template": "The following is an extract from {source}, complete the remainder of the text from memory as accurately as possible: {text}",
+        "version": "1.0",
+        "parameters": ["text", "source"],
+        "metadata": {
+            "author": "Mustafa"
+        },
+        "created_at": "2024-02-01T10:30:00",
+        "performance": []
+    },
+
+    "complete_1": {
+        "template": "Complete this: {text}",
+        "version": "1.0",
+        "parameters": ["text", "source"],
+        "metadata": {
+            "author": "Mustafa"
+        },
+        "created_at": "2024-02-01T10:30:00",
+        "performance": []
+    },
+
+    "complete_2": {
+        "template": "What comes next: {text}",
+        "version": "1.0",
+        "parameters": ["text", "source"],
         "metadata": {
             "author": "Mustafa"
         },

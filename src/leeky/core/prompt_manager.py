@@ -24,7 +24,7 @@ class PromptManager:
         name: str,
         template: str,
         template_type: TemplateType,
-        parameters: Optional[Dict] = None,
+        parameters: Optional[Union[List[str], Dict]] = None,
         metadata: Optional[Dict] = None,
         version: str = "1.0.0"
     ) -> PromptTemplate:
@@ -33,7 +33,7 @@ class PromptManager:
         Args:
             name: Unique name for the template.
             template: The prompt template string.
-            parameters: Dictionary of parameters the template accepts.
+            parameters: List of parameter names that the template accepts (e.g., ["text", "source"]).
             metadata: Additional metadata for the template.
             version: Version string for the template.
             
@@ -48,12 +48,20 @@ class PromptManager:
         
         if name in templates_dict:
             raise PromptError(f"Template '{name}' already exists")
+        
+        # Convert parameters to list if it's a dictionary
+        if parameters is None:
+            params = []
+        elif isinstance(parameters, dict):
+            params = list(parameters.keys())
+        else:
+            params = parameters
             
         template_obj = PromptTemplate(
             template=template,
             name=name,
             version=version,
-            parameters=parameters or {},
+            parameters=params,
             metadata=metadata or {},
             created_at=datetime.now(),
             template_type=template_type
@@ -105,7 +113,7 @@ class PromptManager:
         name: str,
         template_type: TemplateType,
         template: Optional[str] = None,
-        parameters: Optional[Dict] = None,
+        parameters: Optional[Union[List[str], Dict]] = None,
         metadata: Optional[Dict] = None,
         version: Optional[str] = None
     ) -> PromptTemplate:
@@ -114,7 +122,7 @@ class PromptManager:
         Args:
             name: Name of template to update.
             template: New template string (if updating).
-            parameters: New parameters dictionary (if updating).
+            parameters: List of parameter names that the template accepts (e.g., ["text", "source"]) or dictionary to convert to list.
             metadata: New metadata dictionary (if updating).
             version: New version string (if updating).
             
@@ -132,11 +140,20 @@ class PromptManager:
             
         current = templates_dict[name]
         
+        # Convert parameters to list if it's a dictionary
+        if parameters is not None:
+            if isinstance(parameters, dict):
+                params = list(parameters.keys())
+            else:
+                params = parameters
+        else:
+            params = current.parameters.copy()
+
         updated = PromptTemplate(
             template=template or current.template,
             name=name,
             version=version or current.version,
-            parameters=parameters or current.parameters.copy(),
+            parameters=params,
             metadata={**current.metadata, **(metadata or {})},
             created_at=current.created_at,
             template_type=template_type
@@ -311,11 +328,15 @@ class PromptManager:
             self._instruction_templates.clear()
             
             for name, t_data in instruction_data.items():
+                # Convert parameters to list if it's not already
+                params = t_data["parameters"]
+                if isinstance(params, dict):
+                    params = list(params.keys())
                 template = PromptTemplate(
                     template=t_data["template"],
                     name=name,
                     version=t_data["version"],
-                    parameters=t_data["parameters"],
+                    parameters=params,
                     metadata=t_data["metadata"],
                     created_at=datetime.fromisoformat(t_data["created_at"]),
                     template_type=TemplateType.INSTRUCTION
@@ -330,16 +351,22 @@ class PromptManager:
             self._jailbreak_templates.clear()
             
             for name, t_data in jailbreak_data.items():
+                # Convert parameters to list if it's not already
+                params = t_data["parameters"]
+                if isinstance(params, dict):
+                    params = list(params.keys())
                 template = PromptTemplate(
                     template=t_data["template"],
                     name=name,
                     version=t_data["version"],
-                    parameters=t_data["parameters"],
+                    parameters=params,
                     metadata=t_data["metadata"],
                     created_at=datetime.fromisoformat(t_data["created_at"]),
                     template_type=TemplateType.JAILBREAK
                 )
                 self._jailbreak_templates[name] = template
                 self._performance_metrics[name] = t_data.get("performance", [])
+        except json.JSONDecodeError as e:
+            raise PromptError(f"Failed to parse template files: {str(e)}")
         except Exception as e:
             raise PromptError(f"Failed to load templates: {str(e)}")
